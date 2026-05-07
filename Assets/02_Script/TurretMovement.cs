@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
 
 namespace _02_Script
 {
@@ -12,9 +13,16 @@ namespace _02_Script
         public Transform FirePosition;
         [Header("탄환 오브젝트")]
         public GameObject bulletPrefab;
-
-        public float YawSpeed = 30.0f;
-        public float PitchSpeed = 10.0f;
+        [Header("감지용 Collider")]
+        public SphereCollider TurretCollider;
+        [Header("감지된 Target")]
+        public List<GameObject> targetObjects = new List<GameObject>();
+        [Header("총알 오브젝트를 모을 폴더")]
+        public Transform bulletParent;
+        /*public Transform TargetTransform;*/
+        
+        public float YawSpeed = 120.0f;
+        public float PitchSpeed = 60.0f;
 
         public float currentpitch;
         public float minPitch = -45.0f;
@@ -22,13 +30,30 @@ namespace _02_Script
 
         public bool YawMatch;
         public bool PitchMatch;
-        public float fireAngleThreshold = 5.0f;
+        public float fireAngleThreshold = 0.5f;
 
         public float firecurrentime = -999f;
-        public float fireInterval = 0.5f;
-        public float projectileSpeed = 25.0f;
+        public float fireInterval = 0.3f;
+        public float projectileSpeed = 60.0f;
         public float projectilelifetime = 3.0f;
-        public Transform TargetTransform;
+
+        private void Awake()
+        {
+            if(TurretCollider== null) TurretCollider = GetComponent<SphereCollider>();
+        }
+
+        private void OnTriggerEnter(Collider other)
+        {
+            if(!other.gameObject.activeSelf)return;
+            
+            if(other.gameObject.GetComponent<TargetObject>() != null)
+            {
+                if (!targetObjects.Contains(other.gameObject))
+                {
+                    targetObjects.Add(other.gameObject);
+                }
+            }
+        }
         private void Update()
         {
             if (TurretPivot == null)
@@ -37,13 +62,32 @@ namespace _02_Script
             }
             if(orbitYawPivot == null) return;
             if(orbitPitchPivot == null) return;
-            
-            yawAngleRegulator(orbitYawPivot, TargetTransform);
-            pitchAngleRegulator(orbitPitchPivot, TargetTransform);
 
-            if (YawMatch && PitchMatch)
+            if (targetObjects != null && targetObjects.Count > 0)
             {
-                bulletFire();
+                
+                yawAngleRegulator(orbitYawPivot, targetObjects[0].transform);
+                pitchAngleRegulator(orbitPitchPivot, targetObjects[0].transform);
+
+                if (YawMatch && PitchMatch)
+                {
+                    bulletFire();
+                }
+            }
+
+        }
+
+        private void FixedUpdate()
+        {
+            if (targetObjects != null && targetObjects.Count > 0)
+            {
+                for (int i = 0; i < targetObjects.Count; i++)
+                {
+                    if (!targetObjects[i].activeSelf)
+                    {
+                        targetObjects.Remove(targetObjects[i]);
+                    }
+                }
             }
         }
 
@@ -63,11 +107,12 @@ namespace _02_Script
             }
 
             firecurrentime = Time.time;
-            GameObject bullet = Instantiate(bulletPrefab, FirePosition.position, Quaternion.identity);
+            GameObject bullet = Instantiate(bulletPrefab, FirePosition.position, Quaternion.identity , bulletParent);
             if (bullet.GetComponent<Rigidbody>() != null)
             {
                 Rigidbody rb = bullet.GetComponent<Rigidbody>();
                 rb.AddForce(FirePosition.forward * projectileSpeed, ForceMode.Impulse);
+                
             }
             Destroy(bullet, projectilelifetime);
             
@@ -77,7 +122,6 @@ namespace _02_Script
         {
             if(turret == null || target == null) return;
             //거리 구하기 y값 (높이)는 필요 없으니 0 으로 처리. 
-            Vector3 myposition = turret.position;
             Vector3 direction = target.position - turret.position;
             direction.y = 0.0f;
             // 좌표에서 각도 구하기 = arctangent  -> radian 값을 Degree로 변환.
@@ -133,6 +177,12 @@ namespace _02_Script
             if (angle > 0f) return 1f;
             if (angle < 0f) return -1f;
             return 0f;
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+            Gizmos.color = Color.chartreuse;
+            Gizmos.DrawWireSphere(TurretPivot.position + TurretCollider.center, TurretCollider.radius);
         }
     }
 }
