@@ -1,5 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace _02_Script
 {
@@ -19,6 +21,11 @@ namespace _02_Script
         public List<GameObject> targetObjects = new List<GameObject>();
         [Header("총알 오브젝트를 모을 폴더")]
         public Transform bulletParent;
+        [Header("상호작용 스크립트")]
+        public Image ReloadSlider;
+        public TurretSound turretSound;
+        public Transform gunBarrel;
+        public GameObject gunFireEffect;
         /*public Transform TargetTransform;*/
         
         public float YawSpeed = 120.0f;
@@ -33,13 +40,20 @@ namespace _02_Script
         public float fireAngleThreshold = 0.5f;
 
         public float firecurrentime = -999f;
-        public float fireInterval = 0.3f;
+        public float fireInterval = 0.4f;
         public float projectileSpeed = 60.0f;
         public float projectilelifetime = 3.0f;
 
         private void Awake()
         {
             if(TurretCollider== null) TurretCollider = GetComponent<SphereCollider>();
+            if (gunFireEffect != null)
+            {
+                if (gunFireEffect.activeSelf)
+                {
+                    gunFireEffect.SetActive(false);
+                }
+            }
         }
 
         private void OnTriggerEnter(Collider other)
@@ -63,6 +77,7 @@ namespace _02_Script
             if(orbitYawPivot == null) return;
             if(orbitPitchPivot == null) return;
 
+            ReloadSliderUpdate();
             if (targetObjects != null && targetObjects.Count > 0)
             {
                 
@@ -71,11 +86,17 @@ namespace _02_Script
 
                 if (YawMatch && PitchMatch)
                 {
-                    bulletFire();
+                    if (Time.time < firecurrentime + fireInterval)
+                    {
+                        return;
+                    }
+                    StartCoroutine(BulletFireSequence());
                 }
             }
 
         }
+
+     
 
         private void FixedUpdate()
         {
@@ -90,7 +111,79 @@ namespace _02_Script
                 }
             }
         }
+        private void ReloadSliderUpdate()
+        {
+            float _timeLerp = Mathf.InverseLerp(firecurrentime, firecurrentime + fireInterval, Time.time);
+            float _fillAmount = Mathf.Lerp(0, 100, _timeLerp)/100;
+            if (_fillAmount < 0.99f)
+            {
+                ReloadSlider.color = Color.red;
+            }
+            else
+            {
+                ReloadSlider.color = Color.green;
+            }
+            ReloadSlider.fillAmount = _fillAmount;
 
+        }
+
+        private IEnumerator BulletFireSequence()
+        {
+           
+            firecurrentime = Time.time;
+            //1.반동 모션
+            StartCoroutine(gunBarrelMoving());
+            //2.사운드 출력
+            playFireSound();
+            //3. 이펙트 출력
+            StartCoroutine(setGunFireEffect());
+            yield return null;
+            //4. 총알 발사
+            bulletFire();
+            yield return null;
+        }
+
+        private void playFireSound()
+        {
+            if(turretSound == null) return;
+            turretSound.PlaySound();
+        }
+        private IEnumerator setGunFireEffect()
+        {
+            
+            gunFireEffect.SetActive(true);
+            yield return new WaitForSeconds(0.2f);
+            gunFireEffect.SetActive(false);
+        }
+
+        private IEnumerator gunBarrelMoving()
+        {
+            if (gunBarrel == null)
+            {
+                Debug.LogWarning("gunBarrelMoving - gunBarrel is null");
+            }
+            float elapsed = 0f; // 경과 시간
+            Vector3 currentPosition = gunBarrel.localPosition; // 바렐 위치
+            Vector3 targetPosition = currentPosition + Vector3.back; // 목표 위치
+
+            while (elapsed < fireInterval/2)
+            {
+                elapsed += Time.deltaTime;
+                float t =  elapsed / (fireInterval/2);
+                gunBarrel.localPosition = Vector3.Lerp(currentPosition, targetPosition, t);
+                
+                yield return null;
+            }
+            elapsed = 0f;
+            while (elapsed < fireInterval/2)
+            {
+                elapsed += Time.deltaTime;
+                float t =  elapsed / (fireInterval/2);
+                gunBarrel.localPosition = Vector3.Lerp(targetPosition, currentPosition, t);
+                
+                yield return null;
+            }
+        }
         private void bulletFire()
         {
             if (FirePosition == null)
@@ -98,15 +191,6 @@ namespace _02_Script
                 Debug.Log("FirePosition이 설정되어있지 않습니다.");
                 return;
             }
-
-            
-            if (Time.time < firecurrentime + fireInterval)
-            {
-                Debug.Log("재장전중...");
-                return;
-            }
-
-            firecurrentime = Time.time;
             GameObject bullet = Instantiate(bulletPrefab, FirePosition.position, Quaternion.identity , bulletParent);
             if (bullet.GetComponent<Rigidbody>() != null)
             {

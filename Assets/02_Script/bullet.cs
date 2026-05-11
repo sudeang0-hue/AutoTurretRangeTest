@@ -9,7 +9,8 @@ namespace _02_Script
         {
             if (other.gameObject.GetComponent<TargetObject>() != null)
             {
-                other.gameObject.SetActive(false);
+                TargetObject TO = other.gameObject.GetComponent<TargetObject>();
+                TO.HitTarget();
             }
         }
     }

@@ -5,8 +5,6 @@ namespace _02_Script
    using System.Collections.Generic;
 using UnityEngine;
 
-namespace TurretDemo
-{
     /// <summary>
     /// 랜덤 SpawnPoint에서 Enemy를 생성하고 최대 개수를 관리합니다.
     /// </summary>
@@ -27,6 +25,11 @@ namespace TurretDemo
         private Transform enemyRoot;
 
         [Header("Spawn Settings")]
+        [SerializeField]
+        [Min(1)]
+        private int targetSetCount = 50;
+        public int TargetSet => targetSetCount;
+        private int TargerCount;
         [SerializeField]
         [Min(1)]
         private int initialSpawnCount = 4;
@@ -138,6 +141,7 @@ namespace TurretDemo
             obj.transform.position = spawnPoint.position;
             obj.transform.rotation = rotation;
             // 타겟 활성화
+            TargerCount++;
             return true;
         }
 
@@ -166,13 +170,20 @@ namespace TurretDemo
             {
                 return;
             }
-
+            if(!CountSetting()) return;
+            
             if (createTarget())
             {
                 nextSpawnTimeSeconds = Time.time + spawnIntervalSeconds;
             }
         }
+
+        private bool CountSetting()
+        {
+            if(targetSetCount <= TargerCount) return false;
+            
+            return true;
+        }
         
     }
-}
 }
